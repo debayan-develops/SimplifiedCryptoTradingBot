@@ -1,0 +1,16 @@
+# Ignore environment variables file
+.env
+
+# Ignore Python cache files
+__pycache__/
+*.pyc
+
+# Ignore the log file
+trading_bot.log
+
+# Ignore the instance folder (used by Flask for development DBs etc.)
+instance/
+
+# Ignore venv (if you created a virtual environment inside the project)
+venv/
+.venv/

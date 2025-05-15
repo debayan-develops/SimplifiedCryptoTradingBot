@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Binance Futures Testnet Bot</title>
+    <style>
+        /* Basic CSS for a "good looking" simple UI */
+        body {
+            font-family: sans-serif;
+            line-height: 1.6;
+            margin: 20px;
+            background-color: #f4f4f4;
+            color: #333;
+        }
+        .container {
+            max-width: 900px;
+            margin: auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h1, h2 {
+            color: #0056b3;
+        }
+        form {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"],
+        input[type="number"],
+        select {
+            width: calc(100% - 22px); /* Adjust for padding and border */
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+         input[type="text"].inline,
+         input[type="number"].inline,
+         select.inline {
+             width: auto; /* Allow inline elements to size based on content */
+             display: inline-block;
+             margin-right: 10px; /* Add some spacing between inline elements */
+         }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .balance-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        .balance-table th, .balance-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .balance-table th {
+            background-color: #007bff;
+            color: white;
+        }
+        .balance-table tr:nth-child(even){background-color: #f2f2f2;}
+
+        .order-form-section, .status-cancel-section {
+            margin-bottom: 30px;
+        }
+
+        #limit_price_field, #stop_price_field, #stop_limit_price_field {
+            display: none; /* Hide limit/stop fields by default */
+        }
+
+        /* Styles for flashed messages */
+        .flash-message {
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .flash-message.success {
+            background-color: #d4edda;
+            color: #155724;
+            border-color: #c3e6cb;
+        }
+        .flash-message.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border-color: #f5c6cb;
+        }
+        .flash-message.warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border-color: #ffeeba;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Binance Futures Testnet Trading Bot</h1>
+
+        {# Display flashed messages #}
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flashed-messages">
+                    {% for category, message in messages %}
+                        <div class="flash-message {{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+
+        <div class="balance-section">
+            <h2>Account Balance</h2>
+            {% if account_balance %}
+                <table class="balance-table">
+                    <thead>
+                        <tr>
+                            <th>Asset</th>
+                            <th>Balance</th>
+                            <th>Available Balance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for asset in account_balance %}
+                            <tr>
+                                <td>{{ asset['asset'] }}</td>
+                                <td>{{ asset['balance'] }}</td>
+                                <td>{{ asset['availableBalance'] }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% elif account_balance is none %}
+                 <p>Fetching account balance...</p> {# Indicate if balance is being fetched #}
+            {% else %}
+                <p>Could not fetch account balance. Please check API keys and terminal logs.</p> {# Error case #}
+            {% endif %}
+        </div>
+
+        <hr>
+
+        <div class="order-form-section">
+            <h2>Place New Order</h2>
+            <form action="{{ url_for('place_order') }}" method="post">
+                <label for="order_type">Order Type:</label>
+                <select id="order_type" name="order_type" onchange="togglePriceFields()">
+                    <option value="market">Market Order</option>
+                    <option value="limit">Limit Order</option>
+                    <option value="stop_limit">Stop-Limit Order</option>
+                </select>
+
+                <label for="symbol">Symbol (e.g., BTCUSDT):</label>
+                <input type="text" id="symbol" name="symbol" required>
+
+                <label for="side">Side:</label>
+                <select id="side" name="side">
+                    <option value="buy">BUY</option>
+                    <option value="sell">SELL</option>
+                </select>
+
+                <label for="quantity">Quantity:</label>
+                <input type="number" id="quantity" name="quantity" step="any" min="0" required>
+
+                <div id="limit_price_field">
+                    <label for="price">Limit Price:</label>
+                    <input type="number" id="price" name="price" step="any" min="0">
+                </div>
+
+                 <div id="stop_price_field">
+                    <label for="stop_price">Stop Price (Trigger):</label>
+                    <input type="number" id="stop_price" name="stop_price" step="any" min="0">
+                </div>
+
+                 <div id="stop_limit_price_field">
+                    <label for="limit_price">Limit Price (for Stop-Limit):</label>
+                    <input type="number" id="limit_price" name="limit_price" step="any" min="0">
+                </div>
+
+
+                <button type="submit">Place Order</button>
+            </form>
+        </div>
+
+        <hr>
+
+        <div class="status-cancel-section">
+            <h2>Check Order Status or Cancel</h2>
+            <form action="{{ url_for('check_status') }}" method="post" style="display: inline-block; margin-right: 20px;">
+                 <label for="status_symbol">Symbol:</label>
+                 <input type="text" id="status_symbol" name="status_symbol" class="inline" style="width: 100px;" required>
+
+                <label for="order_id">Order ID:</label>
+                <input type="text" id="order_id" name="order_id" class="inline" required>
+
+                <button type="submit">Check Status</button>
+            </form>
+
+             <form action="{{ url_for('cancel_order') }}" method="post" style="display: inline-block;">
+                 <label for="cancel_symbol">Symbol:</label>
+                 <input type="text" id="cancel_symbol" name="cancel_symbol" class="inline" style="width: 100px;" required>
+
+                <label for="cancel_order_id">Order ID to Cancel:</label>
+                <input type="text" id="cancel_order_id" name="cancel_order_id" class="inline" required>
+
+                <button type="submit">Cancel Order</button>
+            </form>
+        </div>
+
+    </div>
+
+    <script>
+        // JavaScript to toggle price fields based on order type
+        function togglePriceFields() {
+            const orderType = document.getElementById('order_type').value;
+            const limitPriceField = document.getElementById('limit_price_field');
+            const stopPriceField = document.getElementById('stop_price_field');
+             const stopLimitPriceField = document.getElementById('stop_limit_price_field');
+
+            // Hide all price fields initially
+            limitPriceField.style.display = 'none';
+            stopPriceField.style.display = 'none';
+            stopLimitPriceField.style.display = 'none';
+
+            // Make price inputs not required by default
+            document.getElementById('price').required = false;
+            document.getElementById('stop_price').required = false;
+            document.getElementById('limit_price').required = false;
+
+            // Show relevant fields and make inputs required based on order type
+            if (orderType === 'limit') {
+                limitPriceField.style.display = 'block';
+                 document.getElementById('price').required = true;
+            } else if (orderType === 'stop_limit') {
+                stopPriceField.style.display = 'block';
+                stopLimitPriceField.style.display = 'block';
+                 document.getElementById('stop_price').required = true;
+                 document.getElementById('limit_price').required = true;
+            }
+        }
+
+        // Initialize state on page load
+        togglePriceFields();
+
+    </script>
+
+</body>
+</html>
